@@ -1350,16 +1350,17 @@ private:
     // nor the task-specific executor is found.
     void schedule_impl(bool reset, transwarp::executor* executor=nullptr) override {
         if (schedule_mode_ && !node_->is_canceled() && (reset || !future_.valid())) {
-            std::weak_ptr<task_impl_base> self = this->shared_from_this();
+            auto shared_this = this->shared_from_this();
+            std::weak_ptr<task_impl_base> self = shared_this;
             auto futures = transwarp::detail::get_futures(parents_);
             auto pack_task = std::make_shared<std::packaged_task<result_type()>>(
                     std::bind(&transwarp::detail::call_with_futures<task_type, result_type, decltype(self), decltype(futures)>,
                               node_->get_id(), std::move(self), std::move(futures)));
             future_ = pack_task->get_future();
             if (executor_) {
-                executor_->execute([pack_task] { (*pack_task)(); }, node_);
+                executor_->execute([pack_task, shared_this] { (*pack_task)(); }, node_);
             } else if (executor) {
-                executor->execute([pack_task] { (*pack_task)(); }, node_);
+                executor->execute([pack_task, shared_this] { (*pack_task)(); }, node_);
             } else {
                 (*pack_task)();
             }
